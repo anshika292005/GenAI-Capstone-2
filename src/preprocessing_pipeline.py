@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable
 
 import pandas as pd
@@ -12,12 +13,47 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 NUMERIC_COLUMNS = ["Age", "Credit amount", "Duration"]
 CATEGORICAL_COLUMNS = ["Sex", "Job", "Housing", "Saving accounts", "Checking account", "Purpose"]
 
+COLUMN_ALIASES = {
+    "Age": ["age", "applicant_age", "borrower_age"],
+    "Credit amount": ["credit_amount", "loan_amount", "loanamt", "amount", "principal", "loan_principal"],
+    "Duration": ["duration", "tenure", "loan_duration", "term", "loan_term", "months", "duration_months"],
+    "Sex": ["sex", "gender", "applicant_gender"],
+    "Job": ["job", "job_category", "employment_type", "occupation", "job_type"],
+    "Housing": ["housing", "housing_status", "residence_type", "home_ownership"],
+    "Saving accounts": ["saving_accounts", "savings", "savings_account", "savings_balance"],
+    "Checking account": ["checking_account", "checking", "current_account", "bank_account_status"],
+    "Purpose": ["purpose", "loan_purpose", "application_purpose", "use_of_funds"],
+    "Risk": ["risk", "default_flag", "target", "label", "outcome"],
+}
+
+
+def _normalize_column_name(column_name: str) -> str:
+    lowered = column_name.strip().lower()
+    return re.sub(r"[^a-z0-9]+", "_", lowered).strip("_")
+
 
 def normalize_borrower_frame(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize uploaded borrower data to the schema used across the app.
     """
     normalized = df.copy()
+
+    normalized.columns = [str(col).strip() for col in normalized.columns]
+
+    reverse_aliases: Dict[str, str] = {}
+    for canonical_name, aliases in COLUMN_ALIASES.items():
+        reverse_aliases[_normalize_column_name(canonical_name)] = canonical_name
+        for alias in aliases:
+            reverse_aliases[_normalize_column_name(alias)] = canonical_name
+
+    rename_map: Dict[str, str] = {}
+    for column_name in normalized.columns:
+        canonical_name = reverse_aliases.get(_normalize_column_name(column_name))
+        if canonical_name and canonical_name not in normalized.columns:
+            rename_map[column_name] = canonical_name
+
+    if rename_map:
+        normalized = normalized.rename(columns=rename_map)
 
     if "Unnamed: 0" in normalized.columns:
         normalized = normalized.drop(columns=["Unnamed: 0"])

@@ -437,6 +437,10 @@ def render_kpi_card(label: str, value: str, footnote: str) -> None:
     )
 
 
+def has_columns(df: pd.DataFrame, *columns: str) -> bool:
+    return all(column in df.columns for column in columns)
+
+
 def build_user_summary(profile: Dict[str, Any]) -> str:
     return (
         f"Borrower request: {profile['purpose']} loan for {profile['credit_amount']} DM over "
@@ -512,8 +516,8 @@ with dashboard_tab:
 
     avg_credit_score = int(scored_dataset["Estimated Credit Score"].mean())
     default_rate = scored_dataset["Predicted Default Probability"].ge(0.5).mean() * 100
-    avg_ticket = scored_dataset["Credit amount"].mean()
-    avg_duration = scored_dataset["Duration"].mean()
+    avg_ticket = scored_dataset["Credit amount"].mean() if "Credit amount" in scored_dataset.columns else 0
+    avg_duration = scored_dataset["Duration"].mean() if "Duration" in scored_dataset.columns else 0
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -538,63 +542,72 @@ with dashboard_tab:
         st.plotly_chart(neon_layout(risk_hist), use_container_width=True)
 
     with chart_col2:
-        purpose_mix = (
-            scored_dataset.groupby("Purpose", dropna=False)["Credit amount"]
-            .mean()
-            .reset_index(name="Average Credit Amount")
-        )
-        purpose_fig = px.pie(
-            purpose_mix,
-            names="Purpose",
-            values="Average Credit Amount",
-            hole=0.58,
-            title="Purpose Mix by Average Exposure",
-            color_discrete_sequence=px.colors.sequential.Bluered_r,
-        )
-        purpose_fig.update_traces(textinfo="percent+label")
-        purpose_fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#e8f7ff"),
-            legend=dict(bgcolor="rgba(8,17,31,0.45)"),
-        )
-        st.plotly_chart(purpose_fig, use_container_width=True)
+        if has_columns(scored_dataset, "Purpose", "Credit amount"):
+            purpose_mix = (
+                scored_dataset.groupby("Purpose", dropna=False)["Credit amount"]
+                .mean()
+                .reset_index(name="Average Credit Amount")
+            )
+            purpose_fig = px.pie(
+                purpose_mix,
+                names="Purpose",
+                values="Average Credit Amount",
+                hole=0.58,
+                title="Purpose Mix by Average Exposure",
+                color_discrete_sequence=px.colors.sequential.Bluered_r,
+            )
+            purpose_fig.update_traces(textinfo="percent+label")
+            purpose_fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#e8f7ff"),
+                legend=dict(bgcolor="rgba(8,17,31,0.45)"),
+            )
+            st.plotly_chart(purpose_fig, use_container_width=True)
+        else:
+            st.info("Upload a CSV with loan purpose and amount columns to unlock the exposure mix view.")
 
     heatmap_col, table_col = st.columns([1, 1.2], gap="large")
     with heatmap_col:
-        pivot = (
-            scored_dataset.pivot_table(
-                index="Housing",
-                columns="Purpose",
-                values="Predicted Default Probability",
-                aggfunc="mean",
+        if has_columns(scored_dataset, "Housing", "Purpose", "Predicted Default Probability"):
+            pivot = (
+                scored_dataset.pivot_table(
+                    index="Housing",
+                    columns="Purpose",
+                    values="Predicted Default Probability",
+                    aggfunc="mean",
+                )
+                .fillna(0)
             )
-            .fillna(0)
-        )
-        heat = px.imshow(
-            pivot,
-            text_auto=".2f",
-            color_continuous_scale=["#08111f", "#14345c", "#3ddcff", "#ff5f8f"],
-            title="Risk Heatmap by Housing and Purpose",
-        )
-        st.plotly_chart(neon_layout(heat), use_container_width=True)
+            heat = px.imshow(
+                pivot,
+                text_auto=".2f",
+                color_continuous_scale=["#08111f", "#14345c", "#3ddcff", "#ff5f8f"],
+                title="Risk Heatmap by Housing and Purpose",
+            )
+            st.plotly_chart(neon_layout(heat), use_container_width=True)
+        else:
+            st.info("Upload housing and purpose columns to view the cross-segment risk heatmap.")
 
     with table_col:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.markdown("### Underwriting Feed")
+        visible_columns = [
+            column
+            for column in [
+                "Age",
+                "Sex",
+                "Housing",
+                "Credit amount",
+                "Duration",
+                "Purpose",
+                "Estimated Credit Score",
+                "Predicted Default Probability",
+                "Predicted Decision",
+            ]
+            if column in scored_dataset.columns
+        ]
         st.dataframe(
-            scored_dataset[
-                [
-                    "Age",
-                    "Sex",
-                    "Housing",
-                    "Credit amount",
-                    "Duration",
-                    "Purpose",
-                    "Estimated Credit Score",
-                    "Predicted Default Probability",
-                    "Predicted Decision",
-                ]
-            ].sort_values("Predicted Default Probability", ascending=False),
+            scored_dataset[visible_columns].sort_values("Predicted Default Probability", ascending=False),
             use_container_width=True,
             height=440,
         )
