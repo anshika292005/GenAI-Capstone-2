@@ -260,7 +260,14 @@ def load_active_dataset(uploaded_file) -> pd.DataFrame:
 
 
 def actual_model(model: Any) -> Any:
-    return model.best_estimator_ if hasattr(model, "best_estimator_") else model
+    resolved = model.best_estimator_ if hasattr(model, "best_estimator_") else model
+
+    # Older pickled sklearn tree models may not include this attribute, but
+    # newer sklearn versions expect it during prediction-time validation.
+    if not hasattr(resolved, "monotonic_cst"):
+        resolved.monotonic_cst = None
+
+    return resolved
 
 
 def align_features(model: Any, features: pd.DataFrame) -> pd.DataFrame:
