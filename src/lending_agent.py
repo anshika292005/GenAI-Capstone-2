@@ -4,6 +4,8 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+from langchain_core.messages import AIMessage, HumanMessage
+
 from src.model_inference import predict_risk_score
 from src.rag_pipeline import build_policy_query, get_policy_context
 
@@ -24,6 +26,12 @@ def _format_policy_exception_guidance(policy_context: str) -> str:
 def _build_llm():
     provider = os.getenv("LENDING_AGENT_PROVIDER", "").strip().lower()
 
+    if provider in {"groq", ""} and os.getenv("GROQ_API_KEY"):
+        from langchain_groq import ChatGroq
+
+        model_name = os.getenv("LENDING_AGENT_MODEL", "llama-3.3-70b-versatile")
+        return ChatGroq(model=model_name, temperature=0)
+
     if provider in {"openai", ""} and os.getenv("OPENAI_API_KEY"):
         from langchain_openai import ChatOpenAI
 
@@ -37,8 +45,8 @@ def _build_llm():
         return ChatAnthropic(model=model_name, temperature=0)
 
     raise RuntimeError(
-        "No supported LLM provider is configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY, "
-        "and optionally LENDING_AGENT_PROVIDER / LENDING_AGENT_MODEL."
+        "No supported LLM provider is configured. Set GROQ_API_KEY, OPENAI_API_KEY, or "
+        "ANTHROPIC_API_KEY, and optionally LENDING_AGENT_PROVIDER / LENDING_AGENT_MODEL."
     )
 
 
@@ -80,15 +88,29 @@ def _build_fallback_verdict(
     }
 
 
-def _get_memory():
-    from langchain.memory import ConversationBufferMemory
+class SimpleConversationBufferMemory:
+    """
+    Small local replacement for ConversationBufferMemory to avoid version-specific
+    LangChain memory import issues on deployment targets.
+    """
 
-    return ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True,
-        input_key="question",
-        output_key="answer",
-    )
+    def __init__(self) -> None:
+        self.chat_history: list[Any] = []
+
+    def load_memory_variables(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return {"chat_history": self.chat_history}
+
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> None:
+        question = inputs.get("question")
+        answer = outputs.get("answer")
+        if question:
+            self.chat_history.append(HumanMessage(content=str(question)))
+        if answer:
+            self.chat_history.append(AIMessage(content=str(answer)))
+
+
+def _get_memory():
+    return SimpleConversationBufferMemory()
 
 
 def build_lending_tools(

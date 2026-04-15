@@ -115,6 +115,14 @@ pipeline as LangChain tools:
 To enable the LLM-backed tool-calling agent, configure one of these:
 
 ```bash
+export GROQ_API_KEY=...
+export LENDING_AGENT_PROVIDER=groq
+export LENDING_AGENT_MODEL=llama-3.3-70b-versatile
+```
+
+or
+
+```bash
 export OPENAI_API_KEY=...
 export LENDING_AGENT_PROVIDER=openai
 export LENDING_AGENT_MODEL=gpt-4o

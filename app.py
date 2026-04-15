@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -21,6 +22,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+if "GROQ_API_KEY" in st.secrets and not os.getenv("GROQ_API_KEY"):
+    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+if "LENDING_AGENT_PROVIDER" in st.secrets and not os.getenv("LENDING_AGENT_PROVIDER"):
+    os.environ["LENDING_AGENT_PROVIDER"] = st.secrets["LENDING_AGENT_PROVIDER"]
 
 
 BASE_DIR = Path(__file__).resolve().parent

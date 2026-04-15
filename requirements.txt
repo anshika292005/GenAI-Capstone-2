@@ -11,8 +11,10 @@ matplotlib
 seaborn
 langchain
 langchain-community
+langchain-core
 langchain-openai
 langchain-anthropic
+langchain-groq
 sentence-transformers
 faiss-cpu
 pypdf
