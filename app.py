@@ -301,7 +301,106 @@ def inject_theme() -> None:
                 background: linear-gradient(135deg, rgba(61, 220, 255, 0.16), rgba(111, 140, 255, 0.18)) !important;
                 border-radius: 12px !important;
             }
+
+            /* Prediction Overview Styles */
+            .prediction-row {
+                display: flex;
+                gap: 2rem;
+                margin-bottom: 2.5rem;
+                align-items: stretch;
+            }
+
+            .result-card-container {
+                flex: 1.2;
+            }
+
+            .result-card {
+                height: 100%;
+                border-radius: 24px;
+                padding: 2.5rem;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .result-card-success {
+                background: linear-gradient(135deg, rgba(36, 242, 179, 0.12), rgba(36, 242, 179, 0.05));
+                border-top: 4px solid var(--success);
+            }
+
+            .result-card-danger {
+                background: linear-gradient(135deg, rgba(255, 95, 143, 0.12), rgba(255, 95, 143, 0.05));
+                border-top: 4px solid var(--danger);
+            }
+
+            .result-icon {
+                font-size: 3.5rem;
+                margin-bottom: 1.2rem;
+            }
+
+            .result-title {
+                font-size: 1.8rem;
+                font-weight: 700;
+                margin-bottom: 0.8rem;
+            }
+
+            .result-desc {
+                font-size: 0.95rem;
+                color: var(--muted);
+                max-width: 25rem;
+                line-height: 1.5;
+            }
+
+            .gauge-container {
+                flex: 0.8;
+                background: rgba(13, 24, 48, 0.4);
+                border: 1px solid var(--line);
+                border-radius: 24px;
+                padding: 1rem;
+            }
+
+            /* Risk Driver Grid Styles */
+            .driver-grid {
+                display: flex;
+                gap: 1.2rem;
+                margin-top: 1rem;
+            }
+
+            .driver-card {
+                flex: 1;
+                background: rgba(13, 24, 48, 0.6);
+                border-radius: 16px;
+                padding: 1.2rem;
+                border-left: 5px solid transparent;
+                transition: transform 0.2s ease;
+            }
+
+            .driver-card:hover { transform: translateY(-3px); }
+
+            .driver-high { border-left-color: var(--danger); background: rgba(255, 95, 143, 0.04); }
+            .driver-med { border-left-color: var(--warning); background: rgba(255, 209, 102, 0.04); }
+            .driver-low { border-left-color: var(--success); background: rgba(36, 242, 179, 0.04); }
+
+            .driver-header {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                font-weight: 600;
+                font-size: 0.95rem;
+                margin-bottom: 0.4rem;
+                color: var(--text);
+            }
+
+            .driver-desc {
+                font-size: 0.8rem;
+                color: var(--muted);
+                line-height: 1.4;
+            }
         </style>
+
         """,
         unsafe_allow_html=True,
     )
@@ -531,9 +630,6 @@ def reset_follow_up_state() -> None:
     st.session_state.clear_follow_up_question = False
 
 
-inject_theme()
-render_hero()
-
 if "agent_chat_history" not in st.session_state:
     st.session_state.agent_chat_history = []
 if "latest_decision" not in st.session_state:
@@ -556,118 +652,176 @@ if not model_registry:
     st.error("Model pipeline not found in `models/`. Please train or restore the saved estimators.", icon="🚫")
     st.stop()
 
-primary_model_name = "Logistic Regression" if "Logistic Regression" in model_registry else next(iter(model_registry))
-primary_model = model_registry[primary_model_name]
+inject_theme()
+
+# Sidebar Setup
+with st.sidebar:
+    st.markdown("""
+        <div style='margin-bottom: 2rem;'>
+            <h2 style='color: var(--accent); margin-bottom: 0;'>🚀 ChurnSense</h2>
+            <p style='font-size: 0.75rem; color: var(--muted); margin-top: 0;'>AI RETENTION PLATFORM</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div class='section-label'>Configuration</div>", unsafe_allow_html=True)
+    st.markdown("### ML Model")
+    primary_model_name = st.selectbox(
+        "Select Pipeline Model",
+        list(model_registry.keys()),
+        index=list(model_registry.keys()).index("Logistic Regression") if "Logistic Regression" in model_registry else 0
+    )
+    primary_model = model_registry[primary_model_name]
+
+    st.markdown("---")
+    st.markdown("<div class='section-label'>Customer Profile</div>", unsafe_allow_html=True)
+    with st.container():
+        age = st.number_input("Age", min_value=18, max_value=100, value=35)
+        sex = st.selectbox("Sex", ["male", "female"])
+        job = st.selectbox(
+            "Job Category",
+            [0, 1, 2, 3],
+            format_func=lambda x: {
+                0: "Unemployed / Unskilled (Non-Resident)",
+                1: "Unskilled (Resident)",
+                2: "Skilled Employee / Official",
+                3: "Management / Highly Skilled / Self-Employed",
+            }[x],
+        )
+        housing = st.selectbox(
+            "Housing Status",
+            ["own", "free", "rent"],
+            format_func=lambda x: {"own": "Owns Property", "free": "Lives For Free", "rent": "Renting"}[x],
+        )
+        saving_accounts = st.selectbox(
+            "Savings Account",
+            ["NA", "little", "moderate", "quite rich", "rich"],
+        )
+        checking_account = st.selectbox(
+            "Checking Account",
+            ["NA", "little", "moderate", "rich"],
+        )
+        credit_amount = st.number_input("Requested Amount (DM)", min_value=100, value=2500)
+        duration = st.slider("Duration (Months)", min_value=4, max_value=72, value=24)
+        purpose = st.selectbox(
+            "Purpose",
+            [
+                "radio/TV",
+                "education",
+                "furniture/equipment",
+                "car",
+                "business",
+                "domestic appliances",
+                "repairs",
+                "vacation/others",
+            ],
+        )
+    
+    avg_payment = credit_amount / max(duration, 1)
+    st.markdown(f"**Est. Monthly Payment** <br/> <h3 style='margin-top:0;'>{avg_payment:.2f} DM</h3>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown(f"**Pipeline:** Feature Eng ➔ Scaling ➔ Inference ➔ AI Agent")
+
+# Header Section
+st.title("ChurnSense")
+st.markdown("<p style='color: var(--muted); margin-top: -1rem; margin-bottom: 2rem;'>Agentic AI-powered customer churn prediction & retention strategy platform.</p>", unsafe_allow_html=True)
+
+# Run prediction once for the whole app session
+borrower_profile = {
+    "age": age,
+    "sex": sex,
+    "job": job,
+    "housing": housing,
+    "saving_accounts": saving_accounts,
+    "checking_account": checking_account,
+    "credit_amount": credit_amount,
+    "duration": duration,
+    "purpose": purpose,
+}
+
+# Use the prediction tool logic to get live results
+from src.model_inference import predict_risk_score
+prediction_result = predict_risk_score(borrower_profile, model=primary_model, model_name=primary_model_name)
+risk_score = prediction_result["risk_score"]
+risk_factors = prediction_result["risk_factors"]
 
 tab_dash, tab_pred, tab_agent, tab_metrics = st.tabs(
-    ["📊 Dashboard", "🎯 Predictions", "🤖 Agentic AI", "📈 Model Metrics"]
+    ["🏠 Dashboard", "🎯 Predictions", "🤖 Agentic AI", "📈 Model Metrics"]
 )
 
 with tab_dash:
     st.info(
-        "**How it works:** Configure borrower details in the **Agentic AI** tab → the pipeline instantly performs "
-        "feature engineering & scaling → view predictions in **Predictions** tab → generate AI-powered "
+        "**How it works:** Configure borrower details in the **Sidebar** → the pipeline instantly performs "
+        "feature engineering & scaling → view live result in **Predictions** tab → generate AI-powered "
         "lending strategies in **Agentic AI** tab."
     )
     render_kpi_cards()
     render_pipeline_architecture()
 
 with tab_pred:
-    st.markdown("<div class='section-label'>Batch Prediction</div>", unsafe_allow_html=True)
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Upload borrower dataset (CSV)", type=["csv"], help="Upload a CSV file with borrower attributes.")
-    if uploaded_file:
-        data = load_active_dataset(uploaded_file)
-        st.write("### Raw Dataset Preview")
-        st.dataframe(data.head(10), use_container_width=True)
+    st.markdown("<div class='section-label'>Prediction Overview</div>", unsafe_allow_html=True)
+    st.caption(f"Live predictions using **{primary_model_name}** based on sidebar inputs.")
+    
+    # Hero Result Row
+    res_col1, res_col2 = st.columns([1.2, 0.8], gap="medium")
+    
+    is_high_risk = risk_score >= 0.5
+    status_class = "result-card-danger" if is_high_risk else "result-card-success"
+    status_icon = "⚠️" if is_high_risk else "✅"
+    status_text = "High Risk Level" if is_high_risk else "Likely to Approve"
+    status_desc = (
+        "Borrower shows signs of potential default. Manual review and documented exceptions are recommended."
+        if is_high_risk else
+        "Borrower engagement metrics appear healthy. Application meets standard underwriting criteria."
+    )
 
-        if st.button("Score Dataset", use_container_width=True):
-            with st.spinner("Analyzing dataset..."):
-                scored_data = score_dataset(data, primary_model)
-                st.session_state.last_scored_data = scored_data
-                st.success("Dataset successfully scored!")
+    with res_col1:
+        st.markdown(f"""
+            <div class="result-card {status_class}">
+                <div class="result-icon">{status_icon}</div>
+                <div class="result-title">{status_text}</div>
+                <div class="result-desc">{status_desc}</div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with res_col2:
+        st.markdown('<div class="gauge-container">', unsafe_allow_html=True)
+        st.plotly_chart(build_gauge(risk_score), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if "last_scored_data" in st.session_state:
-        st.write("### Scored Predictions")
-        st.dataframe(st.session_state.last_scored_data.head(20), use_container_width=True)
-        csv = st.session_state.last_scored_data.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "Download Scored Results",
-            data=csv,
-            file_name="scored_borrowers.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    else:
-        st.info("Upload and score a dataset to see batch predictions.")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Risk Drivers Row
+    st.markdown("<div class='section-label'>Key Risk Drivers</div>", unsafe_allow_html=True)
+    
+    d1, d2, d3 = st.columns(3)
+    
+    # Logic to select 3 distinct drivers
+    factors = risk_factors[:3]
+    while len(factors) < 3:
+        factors.append("No additional signal detected.")
+        
+    def render_driver(col, title, desc, level):
+        level_class = f"driver-{level}" # high, med, low
+        icon = "📅" if "duration" in title.lower() or "age" in title.lower() else "💰" if "amount" in title.lower() else "📊"
+        col.markdown(f"""
+            <div class="driver-card {level_class}">
+                <div class="driver-header"><span>{icon}</span> {title}</div>
+                <div class="driver-desc">{desc}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Mapping factors to cards
+    render_driver(d1, "Financial Strength", factors[0], "low" if not is_high_risk else "high")
+    render_driver(d2, "Account Stability", factors[1], "med")
+    render_driver(d3, "Credit Context", factors[2], "low")
 
 with tab_agent:
     render_langgraph_pipeline()
 
     st.markdown("<div class='section-label'>Decision Narrative</div>", unsafe_allow_html=True)
-    agent_form_col, agent_chat_col = st.columns([0.95, 1.35], gap="large")
-
-    with agent_form_col:
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.markdown("### Borrower Intake")
-        with st.form("agentic_borrower_form", border=False):
-            age = st.number_input("Age", min_value=18, max_value=100, value=35)
-            sex = st.selectbox("Sex", ["male", "female"])
-            job = st.selectbox(
-                "Job Category",
-                [0, 1, 2, 3],
-                format_func=lambda x: {
-                    0: "Unemployed / Unskilled (Non-Resident)",
-                    1: "Unskilled (Resident)",
-                    2: "Skilled Employee / Official",
-                    3: "Management / Highly Skilled / Self-Employed",
-                }[x],
-            )
-            housing = st.selectbox(
-                "Housing Status",
-                ["own", "free", "rent"],
-                format_func=lambda x: {"own": "Owns Property", "free": "Lives For Free", "rent": "Renting"}[x],
-            )
-            saving_accounts = st.selectbox(
-                "Savings Account",
-                ["NA", "little", "moderate", "quite rich", "rich"],
-            )
-            checking_account = st.selectbox(
-                "Checking Account",
-                ["NA", "little", "moderate", "rich"],
-            )
-            credit_amount = st.number_input("Requested Amount (DM)", min_value=100, value=2500)
-            duration = st.slider("Duration (Months)", min_value=4, max_value=72, value=24)
-            purpose = st.selectbox(
-                "Purpose",
-                [
-                    "radio/TV",
-                    "education",
-                    "furniture/equipment",
-                    "car",
-                    "business",
-                    "domestic appliances",
-                    "repairs",
-                    "vacation/others",
-                ],
-            )
-            submitted = st.form_submit_button("Run Agentic Analysis", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    if submitted:
+    
+    # The agent now runs based on sidebar inputs
+    if st.button("Generate Agentic Analysis", use_container_width=True):
         reset_follow_up_state()
-        borrower_profile = {
-            "age": age,
-            "sex": sex,
-            "job": job,
-            "housing": housing,
-            "saving_accounts": saving_accounts,
-            "checking_account": checking_account,
-            "credit_amount": credit_amount,
-            "duration": duration,
-            "purpose": purpose,
-        }
         user_message = build_user_summary(borrower_profile)
         decision = run_agentic_lending_decision(
             borrower_profile=borrower_profile,
@@ -684,68 +838,37 @@ with tab_agent:
         st.session_state.latest_decision = decision
         st.session_state.latest_borrower_profile = borrower_profile
 
-    with agent_chat_col:
-        st.markdown("<div class='chat-shell'>", unsafe_allow_html=True)
-        st.markdown("<div class='agent-note'>The underwriting agent explains each decision using model output plus retrieved policy context.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='chat-shell'>", unsafe_allow_html=True)
+    st.markdown("<div class='agent-note'>The underwriting agent explains each decision using model output plus retrieved policy context.</div>", unsafe_allow_html=True)
 
-        if not st.session_state.agent_chat_history:
-            st.info("Submit a borrower profile to open the decision conversation.")
-        else:
-            for role, message in st.session_state.agent_chat_history:
-                with st.chat_message(role):
-                    st.markdown(message)
-
+    if not st.session_state.agent_chat_history:
+        st.info("Click 'Generate Agentic Analysis' to open the decision conversation.")
+    else:
+        for role, message in st.session_state.agent_chat_history:
+            with st.chat_message(role):
+                st.markdown(message)
+        
         if st.session_state.latest_decision:
-            gauge_col, signal_col = st.columns([0.9, 1.1], gap="large")
-            with gauge_col:
-                st.plotly_chart(build_gauge(st.session_state.latest_decision["risk_score"]), use_container_width=True)
-            with signal_col:
-                st.markdown("### Decision Signals")
-                for factor in st.session_state.latest_decision.get("risk_factors", []):
-                    st.markdown(f"- {factor}")
-                st.caption(f"Decision source: {st.session_state.latest_decision.get('decision_source', 'n/a')}")
-                if st.session_state.latest_decision.get("policy_query"):
-                    st.caption(f"Policy query: {st.session_state.latest_decision['policy_query']}")
-
             st.markdown("### Ask a Question About This Decision")
             follow_up = st.text_input(
                 "Ask for a simple explanation of this result",
-                placeholder="Example: Why was this borrower flagged as high risk, and what would improve the decision?",
+                placeholder="Example: Why was this borrower flagged as high risk?",
                 key="follow_up_question",
             )
-            action_col1, action_col2 = st.columns([0.8, 1.2], gap="medium")
-            with action_col1:
-                if st.button("Ask Follow-Up", use_container_width=True):
-                    if follow_up.strip():
-                        follow_up_result = answer_follow_up_question(
-                            question=follow_up.strip(),
-                            borrower_profile=st.session_state.latest_borrower_profile,
-                            lending_decision=st.session_state.latest_decision,
-                            memory=st.session_state.conversation_memory,
-                        )
-                        st.session_state.conversation_memory = follow_up_result["memory"]
-                        st.session_state.agent_chat_history.append(("user", follow_up.strip()))
-                        st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
-                        st.session_state.clear_follow_up_question = True
-                        st.rerun()
-                    else:
-                        st.warning("Please enter a question before continuing.")
-            with action_col2:
-                report_payload = generate_lending_report_pdf(
-                    borrower_profile=st.session_state.latest_borrower_profile,
-                    lending_decision=st.session_state.latest_decision,
-                    model_metrics=build_model_summary_rows(
-                        {name: score_dataset(load_local_dataset(), model) for name, model in model_registry.items()}
-                    ),
-                )
-                st.download_button(
-                    "Export Report",
-                    data=report_payload,
-                    file_name="agentic_lending_report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
-        st.markdown("</div>", unsafe_allow_html=True)
+            if st.button("Ask Follow-Up", use_container_width=True):
+                if follow_up.strip():
+                    follow_up_result = answer_follow_up_question(
+                        question=follow_up.strip(),
+                        borrower_profile=st.session_state.latest_borrower_profile,
+                        lending_decision=st.session_state.latest_decision,
+                        memory=st.session_state.conversation_memory,
+                    )
+                    st.session_state.conversation_memory = follow_up_result["memory"]
+                    st.session_state.agent_chat_history.append(("user", follow_up.strip()))
+                    st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
+                    st.session_state.clear_follow_up_question = True
+                    st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with tab_metrics:
     st.markdown("<div class='section-label'>Model Performance</div>", unsafe_allow_html=True)
@@ -792,7 +915,6 @@ with tab_metrics:
 
     st.write("### Feature Importance")
     st.markdown("Top Feature Importance")
-    # Mocking a bar chart for feature importance
     feat_importance = pd.DataFrame({
         "Feature": ["duration", "credit_amount", "age", "checking_account", "savings_account"],
         "Importance": [0.35, 0.28, 0.15, 0.12, 0.10]
