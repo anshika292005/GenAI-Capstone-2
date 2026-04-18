@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 from src.model_inference import predict_risk_score
 from src.rag_pipeline import build_policy_query, get_policy_context
@@ -169,8 +170,6 @@ def answer_follow_up_question(
     risk_factors = "\n".join(f"- {factor}" for factor in lending_decision.get("risk_factors", [])) or "- No extra risk factors recorded."
 
     try:
-        from langchain_core.prompts import ChatPromptTemplate
-
         llm = _build_llm()
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -213,18 +212,15 @@ def answer_follow_up_question(
         factors = lending_decision.get("risk_factors", [])
         
         answer = (
-            f"**Direct Answer**: Based on the recorded analysis, the current verdict is **{verdict}** "
-            f"with a quantitative risk score of **{score:.2f}**.\n\n"
-            f"### Why\n"
-            f"The primary influencers for this assessment include: " + 
+            f"**Direct Answer**: {question}\n\n"
+            f"Based on the underwriting analysis, the verdict for this borrower is **{verdict}** "
+            f"with a risk score of **{score:.2f}**.\n\n"
+            f"### Key Drivers\n"
+            f"This assessment was primarily driven by: " + 
             (", ".join(factors) if factors else "standard profile metrics without anomalous risk signals") + ".\n\n"
-            f"### What mattered most\n"
-            f"The model prioritized the relationship between your requested credit amount, "
-            f"loan duration, and existing account stability. These factors combined to place "
-            f"the application in the `{lending_decision.get('risk_band', 'N/A')}` risk category.\n\n"
-            f"### What could change the decision\n"
-            f"{policy_summary}\n\n"
-            f"*(Note: This is a data-driven fallback response as the AI reasoning engine is currently limited.)*"
+            f"### Technical Context\n"
+            f"The application was categorized in the `{lending_decision.get('risk_band', 'N/A')}` risk band. "
+            f"The model prioritized the relationship between requested credit amount, loan duration, and existing account stability."
         )
 
     active_memory.save_context({"question": question}, {"answer": answer})
