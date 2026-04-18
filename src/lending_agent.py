@@ -174,7 +174,11 @@ def answer_follow_up_question(
                     "system",
                     "You are a lending risk copilot answering follow-up questions about one borrower. "
                     "Use the existing decision, borrower profile, risk factors, and policy summary. "
-                    "Be precise and concise, and do not contradict the recorded verdict.",
+                    "Explain the answer in very simple, plain language. "
+                    "Start with a direct answer in one sentence, then give short sections named "
+                    "`Why`, `What mattered most`, and `What could change the decision`. "
+                    "If the question is about a declined or risky borrower, clearly say what would need "
+                    "to improve. Do not contradict the recorded verdict.",
                 ),
                 ("placeholder", "{chat_history}"),
                 (
@@ -201,10 +205,11 @@ def answer_follow_up_question(
         answer = getattr(response, "content", str(response))
     except Exception:
         answer = (
-            f"The current borrower verdict is `{lending_decision.get('final_verdict', 'Unavailable')}` "
-            f"with risk score {lending_decision.get('risk_score', 0):.2f}. "
-            f"Key factors were: {', '.join(lending_decision.get('risk_factors', [])) or 'no extra signals recorded'}. "
-            f"Policy context considered: {policy_summary}"
+            f"Direct answer: The current borrower decision is `{lending_decision.get('final_verdict', 'Unavailable')}` "
+            f"with a risk score of {lending_decision.get('risk_score', 0):.2f}.\n\n"
+            f"Why:\n{', '.join(lending_decision.get('risk_factors', [])) or 'No extra risk signals were recorded.'}\n\n"
+            f"What mattered most:\nThe decision used the borrower profile, model score, and policy guidance.\n\n"
+            f"What could change the decision:\n{policy_summary}"
         )
 
     active_memory.save_context({"question": question}, {"answer": answer})

@@ -354,6 +354,14 @@ def build_user_summary(profile: Dict[str, Any]) -> str:
         f"housing {profile['housing']}, savings {profile['saving_accounts']}, "
         f"checking {profile['checking_account']}, job bucket {profile['job']}."
     )
+
+
+def reset_follow_up_state() -> None:
+    st.session_state.conversation_memory = None
+    st.session_state.agent_chat_history = []
+    st.session_state.follow_up_question = ""
+
+
 inject_theme()
 render_hero()
 
@@ -365,6 +373,8 @@ if "latest_borrower_profile" not in st.session_state:
     st.session_state.latest_borrower_profile = None
 if "conversation_memory" not in st.session_state:
     st.session_state.conversation_memory = None
+if "follow_up_question" not in st.session_state:
+    st.session_state.follow_up_question = ""
 
 model_registry = load_model_registry()
 if not model_registry:
@@ -425,6 +435,7 @@ with agent_form_col:
     st.markdown("</div>", unsafe_allow_html=True)
 
 if submitted:
+    reset_follow_up_state()
     borrower_profile = {
         "age": age,
         "sex": sex,
@@ -447,7 +458,6 @@ if submitted:
         f"Reasoning:\n{decision['reasoning']}\n\n"
         f"Policy Summary:\n{decision.get('policy_context', 'No policy context retrieved.')}"
     )
-    st.session_state.conversation_memory = None
     st.session_state.agent_chat_history.append(("user", user_message))
     st.session_state.agent_chat_history.append(("assistant", agent_message))
     st.session_state.latest_decision = decision
@@ -476,10 +486,10 @@ with agent_chat_col:
             if st.session_state.latest_decision.get("policy_query"):
                 st.caption(f"Policy query: {st.session_state.latest_decision['policy_query']}")
 
-        st.markdown("### Follow-Up Questions")
+        st.markdown("### Ask a Question About This Decision")
         follow_up = st.text_input(
-            "Ask the agent to clarify this borrower decision",
-            placeholder="Why was this borrower marked high risk, and what exception would matter most?",
+            "Ask for a simple explanation of this result",
+            placeholder="Example: Why was this borrower flagged as high risk, and what would improve the decision?",
             key="follow_up_question",
         )
         action_col1, action_col2 = st.columns([0.8, 1.2], gap="medium")
@@ -495,9 +505,10 @@ with agent_chat_col:
                     st.session_state.conversation_memory = follow_up_result["memory"]
                     st.session_state.agent_chat_history.append(("user", follow_up.strip()))
                     st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
+                    st.session_state.follow_up_question = ""
                     st.rerun()
                 else:
-                    st.warning("Enter a follow-up question to continue the conversation.")
+                    st.warning("Please enter a question before continuing.")
         with action_col2:
             report_payload = generate_lending_report_pdf(
                 borrower_profile=st.session_state.latest_borrower_profile,
