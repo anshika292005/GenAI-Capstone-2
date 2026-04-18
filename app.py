@@ -976,32 +976,4 @@ with tab_metrics:
     with cm_right:
         st.plotly_chart(plot_cm("Decision Tree", MODEL_METRICS["Decision Tree"]["CM"]), use_container_width=True)
 
-    st.write("### Live Feature Importance")
-    st.caption(f"Calculated directly from the active **{primary_model_name}** instance.")
-    
-    # Preprocess a sample to get feature names
-    sample_prep = preprocess_uploaded_dataset(load_local_dataset())
-    feature_names = list(sample_prep["transformed"].columns)
-    
-    importance_df = extract_importance(primary_model, feature_names)
-
-    fig = go.Figure(go.Bar(
-        x=importance_df["Importance"],
-        y=importance_df["Feature"],
-        orientation='h',
-        marker=dict(
-            color=importance_df["Importance"],
-            colorscale=[[0, "#3ddcff"], [1.0, "#6f8cff"]]
-        )
-    ))
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e8f7ff"),
-        height=400,
-        margin=dict(l=10, r=10, t=10, b=10),
-        xaxis=dict(title="Relative Score", showgrid=False),
-        yaxis=dict(autorange="reversed")
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
