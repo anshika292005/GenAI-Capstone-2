@@ -63,7 +63,7 @@ def ingest_policy_documents(
     vector_index_dir.mkdir(parents=True, exist_ok=True)
 
     documents = _load_pdf_documents(source_dir)
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS
 
     splitter = RecursiveCharacterTextSplitter(
