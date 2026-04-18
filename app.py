@@ -716,8 +716,8 @@ inject_theme()
 with st.sidebar:
     st.markdown("""
         <div style='margin-bottom: 2rem;'>
-            <h2 style='color: var(--accent); margin-bottom: 0;'>🚀 ChurnSense</h2>
-            <p style='font-size: 0.75rem; color: var(--muted); margin-top: 0;'>AI RETENTION PLATFORM</p>
+            <h2 style='color: var(--accent); margin-bottom: 0;'>🛡️ Credit Analysis</h2>
+            <p style='font-size: 0.75rem; color: var(--muted); margin-top: 0;'>AI UNDERWRITING PLATFORM</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -781,8 +781,8 @@ with st.sidebar:
     st.markdown(f"**Pipeline:** Feature Eng ➔ Scaling ➔ Inference ➔ AI Agent")
 
 # Header Section
-st.title("ChurnSense")
-st.markdown("<p style='color: var(--muted); margin-top: -1rem; margin-bottom: 2rem;'>Agentic AI-powered customer churn prediction & retention strategy platform.</p>", unsafe_allow_html=True)
+st.title("Credit Analysis")
+st.markdown("<p style='color: var(--muted); margin-top: -1rem; margin-bottom: 2rem;'>Agentic AI-powered credit risk prediction & underwriting strategy platform.</p>", unsafe_allow_html=True)
 
 # Run prediction once for the whole app session
 borrower_profile = {
