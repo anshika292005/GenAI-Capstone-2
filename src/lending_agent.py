@@ -204,12 +204,23 @@ def answer_follow_up_question(
         )
         answer = getattr(response, "content", str(response))
     except Exception:
+        verdict = lending_decision.get("final_verdict", "Unavailable")
+        score = lending_decision.get("risk_score", 0)
+        factors = lending_decision.get("risk_factors", [])
+        
         answer = (
-            f"Direct answer: The current borrower decision is `{lending_decision.get('final_verdict', 'Unavailable')}` "
-            f"with a risk score of {lending_decision.get('risk_score', 0):.2f}.\n\n"
-            f"Why:\n{', '.join(lending_decision.get('risk_factors', [])) or 'No extra risk signals were recorded.'}\n\n"
-            f"What mattered most:\nThe decision used the borrower profile, model score, and policy guidance.\n\n"
-            f"What could change the decision:\n{policy_summary}"
+            f"**Direct Answer**: Based on the recorded analysis, the current verdict is **{verdict}** "
+            f"with a quantitative risk score of **{score:.2f}**.\n\n"
+            f"### Why\n"
+            f"The primary influencers for this assessment include: " + 
+            (", ".join(factors) if factors else "standard profile metrics without anomalous risk signals") + ".\n\n"
+            f"### What mattered most\n"
+            f"The model prioritized the relationship between your requested credit amount, "
+            f"loan duration, and existing account stability. These factors combined to place "
+            f"the application in the `{lending_decision.get('risk_band', 'N/A')}` risk category.\n\n"
+            f"### What could change the decision\n"
+            f"{policy_summary}\n\n"
+            f"*(Note: This is a data-driven fallback response as the AI reasoning engine is currently limited.)*"
         )
 
     active_memory.save_context({"question": question}, {"answer": answer})
@@ -237,11 +248,10 @@ def run_agentic_lending_decision(
     )
 
     policy_context = ""
-    if prediction["risk_band"] == "High":
-        try:
-            policy_context = get_policy_context(policy_query)
-        except Exception as exc:
-            policy_context = f"Policy lookup unavailable: {exc}"
+    try:
+        policy_context = get_policy_context(policy_query)
+    except Exception as exc:
+        policy_context = f"Policy lookup unavailable: {exc}"
 
     try:
         from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -257,16 +267,21 @@ def run_agentic_lending_decision(
             [
                 (
                     "system",
-                    "You are an underwriting decision agent. Always call `predict_risk_score` first. "
-                    "If the risk band is High, call `search_policy_docs` using the policy_query returned by the "
-                    "prediction tool to see whether mitigants or documented exceptions apply. "
-                    "Return a concise but complete lending recommendation that includes: "
-                    "1) Final Lending Verdict, 2) Risk Score, 3) Reasoning paragraph, "
-                    "4) Policy Citation Summary. Ground every claim in tool outputs.",
+                    "You are a professional underwriting agent. Always call `predict_risk_score` first. "
+                    "Then call `search_policy_docs` using the policy_query returned by the prediction tool "
+                    "to ground your decision in actual lending standards. "
+                    "Return ONLY a JSON object with the following structure: "
+                    "{"
+                    "  'final_verdict': 'string (e.g. Approve, Decline, Conditional)', "
+                    "  'reasoning': 'string (technical breakdown of risk)', "
+                    "  'recommendations': 'string (bullet points of actionable steps)', "
+                    "  'references': 'string (specific policy citations found)', "
+                    "  'disclaimer': 'string (standard underwriting caveat)'"
+                    "}. Ground every claim in tool outputs.",
                 ),
                 (
                     "human",
-                    "Assess this borrower and produce the final lending verdict.\nBorrower JSON:\n{borrower_payload}",
+                    "Assess this borrower and produce the final lending report.\nBorrower JSON:\n{borrower_payload}",
                 ),
                 ("placeholder", "{agent_scratchpad}"),
             ]
@@ -275,24 +290,54 @@ def run_agentic_lending_decision(
         executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
         result = executor.invoke({"borrower_payload": json.dumps(borrower_profile, default=str)})
 
-        return {
-            "final_verdict": "LLM Agent Recommendation",
-            "risk_band": prediction["risk_band"],
-            "risk_score": prediction["risk_score"],
-            "model_name": prediction["model_name"],
-            "reasoning": result["output"],
-            "risk_factors": prediction["risk_factors"],
-            "policy_query": policy_query,
-            "policy_context": _format_policy_exception_guidance(policy_context),
-            "borrower_profile": borrower_profile,
-            "decision_source": "llm_agent",
-        }
+        # Parse the JSON output from the agent if possible
+        try:
+            raw_output = result["output"]
+            # Basic cleaning in case of markdown wrappers
+            cleaned = raw_output.replace("```json", "").replace("```", "").strip()
+            parsed = json.loads(cleaned)
+            
+            return {
+                "final_verdict": parsed.get("final_verdict", "LLM Agent Recommendation"),
+                "risk_band": prediction["risk_band"],
+                "risk_score": prediction["risk_score"],
+                "model_name": prediction["model_name"],
+                "reasoning": parsed.get("reasoning", result["output"]),
+                "recommendations": parsed.get("recommendations", "Manual review required."),
+                "references": parsed.get("references", _format_policy_exception_guidance(policy_context)),
+                "disclaimer": parsed.get("disclaimer", "Standard underwriting terms apply."),
+                "risk_factors": prediction["risk_factors"],
+                "policy_query": policy_query,
+                "borrower_profile": borrower_profile,
+                "decision_source": "llm_agent",
+            }
+        except:
+            # Fallback to unstructured if parsing fails
+            return {
+                "final_verdict": "LLM Agent Recommendation",
+                "risk_band": prediction["risk_band"],
+                "risk_score": prediction["risk_score"],
+                "model_name": prediction["model_name"],
+                "reasoning": result["output"],
+                "recommendations": "Evaluate debt-to-income and collateral strength.",
+                "references": _format_policy_exception_guidance(policy_context),
+                "disclaimer": "This analysis is for advisory purposes only.",
+                "risk_factors": prediction["risk_factors"],
+                "policy_query": policy_query,
+                "borrower_profile": borrower_profile,
+                "decision_source": "llm_agent",
+            }
     except Exception:
-        return {
-            **_build_fallback_verdict(
-                borrower_profile=borrower_profile,
-                prediction=prediction,
-                policy_context=_format_policy_exception_guidance(policy_context),
-            ),
-            "policy_query": policy_query,
-        }
+        fallback = _build_fallback_verdict(
+            borrower_profile=borrower_profile,
+            prediction=prediction,
+            policy_context=_format_policy_exception_guidance(policy_context),
+        )
+        # Ensure new keys exist in fallback
+        fallback.update({
+            "recommendations": "Manual review of credit history and verification of stated income sources.",
+            "references": _format_policy_exception_guidance(policy_context),
+            "disclaimer": "Advisory report only. Final approval subject to bank compliance officers.",
+            "policy_query": policy_query
+        })
+        return fallback

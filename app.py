@@ -887,9 +887,11 @@ with tab_agent:
             model_name=primary_model_name,
         )
         agent_message = (
-            f"Final Lending Verdict: {decision['final_verdict']}\n\n"
-            f"Reasoning:\n{decision['reasoning']}\n\n"
-            f"Policy Summary:\n{decision.get('policy_context', 'No policy context retrieved.')}"
+            f"### Final Verdict: {decision['final_verdict']}\n\n"
+            f"**Technical Reasoning:**\n{decision['reasoning']}\n\n"
+            f"**Strategic Recommendations:**\n{decision['recommendations']}\n\n"
+            f"**Policy References:**\n{decision['references']}\n\n"
+            f"***Disclaimer:*** *{decision['disclaimer']}*"
         )
         st.session_state.agent_chat_history.append(("user", user_message))
         st.session_state.agent_chat_history.append(("assistant", agent_message))
@@ -908,23 +910,25 @@ with tab_agent:
         
         if st.session_state.latest_decision:
             st.markdown("### Ask a Question About This Decision")
-            follow_up = st.text_input(
-                "Ask for a simple explanation of this result",
-                placeholder="Example: Why was this borrower flagged as high risk?",
-                key="follow_up_question",
-            )
-            if st.button("Ask Follow-Up", use_container_width=True):
-                if follow_up.strip():
-                    follow_up_result = answer_follow_up_question(
-                        question=follow_up.strip(),
-                        borrower_profile=st.session_state.latest_borrower_profile,
-                        lending_decision=st.session_state.latest_decision,
-                        memory=st.session_state.conversation_memory,
-                    )
-                    st.session_state.conversation_memory = follow_up_result["memory"]
-                    st.session_state.agent_chat_history.append(("user", follow_up.strip()))
-                    st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
-                    st.session_state.clear_follow_up_question = True
+            with st.form(key="follow_up_form", clear_on_submit=True):
+                follow_up = st.text_input(
+                    "Ask for a simple explanation of this result",
+                    placeholder="Example: Why was this borrower flagged as high risk?",
+                )
+                submitted = st.form_submit_button("Ask Follow-Up", use_container_width=True)
+                
+                if submitted and follow_up.strip():
+                    with st.spinner("AI is analyzing..."):
+                        follow_up_result = answer_follow_up_question(
+                            question=follow_up.strip(),
+                            borrower_profile=st.session_state.latest_borrower_profile,
+                            lending_decision=st.session_state.latest_decision,
+                            memory=st.session_state.conversation_memory,
+                        )
+                        st.session_state.conversation_memory = follow_up_result["memory"]
+                        st.session_state.agent_chat_history.append(("user", follow_up.strip()))
+                        st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
+                        st.session_state.clear_follow_up_question = True
                     st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 

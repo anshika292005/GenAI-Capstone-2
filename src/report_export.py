@@ -83,14 +83,34 @@ def generate_lending_report_pdf(
         f"<b>Risk Score:</b> {float(lending_decision.get('risk_score', 0)):.3f}",
         f"<b>Model:</b> {lending_decision.get('model_name', 'Unavailable')}",
         f"<b>Decision Source:</b> {lending_decision.get('decision_source', 'Unavailable')}",
-        f"<b>Reasoning:</b> {lending_decision.get('reasoning', 'No reasoning available.')}",
-        f"<b>Policy Summary:</b> {lending_decision.get('policy_context', 'No policy context available.')}",
     ]
-    story.extend([Paragraph("Agent Decision", heading), Spacer(1, 0.1 * inch), *_paragraphs_from_lines(decision_lines, body)])
+    story.extend([Paragraph("Technical Assessment", heading), Spacer(1, 0.1 * inch), *_paragraphs_from_lines(decision_lines, body)])
 
-    risk_factor_lines = [f"- {factor}" for factor in lending_decision.get("risk_factors", [])] or ["- No specific risk factors recorded."]
-    story.extend([Paragraph("Risk Factors", heading), Spacer(1, 0.1 * inch), *_paragraphs_from_lines(risk_factor_lines, body)])
+    # Reasoning Section
+    story.extend([Paragraph("Technical Reasoning", heading), Spacer(1, 0.1 * inch)])
+    reasoning_text = lending_decision.get('reasoning', 'No technical reasoning available.')
+    story.append(Paragraph(reasoning_text.replace("\n", "<br/>"), body))
+    story.append(Spacer(1, 0.2 * inch))
 
+    # Recommendations Section
+    story.extend([Paragraph("Strategic Recommendations", heading), Spacer(1, 0.1 * inch)])
+    recommendations_text = lending_decision.get('recommendations', 'Standard monitoring recommended.')
+    story.append(Paragraph(recommendations_text.replace("\n", "<br/>"), body))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Policy References Section
+    story.extend([Paragraph("Policy References", heading), Spacer(1, 0.1 * inch)])
+    references_text = lending_decision.get('references', 'No specific policy citations retrieved.')
+    story.append(Paragraph(references_text.replace("\n", "<br/>"), body))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Disclaimer Section
+    story.extend([Paragraph("Legal Disclaimer", heading), Spacer(1, 0.1 * inch)])
+    disclaimer_text = lending_decision.get('disclaimer', 'This analysis is for advisory purposes only.')
+    story.append(Paragraph(f"<i>{disclaimer_text}</i>", body))
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Model Comparison Table
     metric_rows = [["Model", "Avg Risk", "High-Risk Share", "Avg Credit Score"]]
     for metric in model_metrics:
         metric_rows.append(
