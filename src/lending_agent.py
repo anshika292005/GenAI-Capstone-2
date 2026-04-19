@@ -89,6 +89,9 @@ def _build_fallback_verdict(
         "risk_factors": risk_factors,
         "policy_context": policy_context,
         "borrower_profile": borrower_profile,
+        "recommendations": "Further verification of income and manual credit bureau check recommended.",
+        "references": "General Underwriting Guidelines (Section 4.1)",
+        "disclaimer": "This is a fallback automated assessment. Final lending power remains with the credit officer.",
         "decision_source": "fallback",
     }
 

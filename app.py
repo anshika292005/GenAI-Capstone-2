@@ -887,11 +887,11 @@ with tab_agent:
             model_name=primary_model_name,
         )
         agent_message = (
-            f"### Final Verdict: {decision['final_verdict']}\n\n"
-            f"**Technical Reasoning:**\n{decision['reasoning']}\n\n"
-            f"**Strategic Recommendations:**\n{decision['recommendations']}\n\n"
-            f"**Policy References:**\n{decision['references']}\n\n"
-            f"***Disclaimer:*** *{decision['disclaimer']}*"
+            f"### Final Verdict: {decision.get('final_verdict', 'LLM Agent Recommendation')}\n\n"
+            f"**Technical Reasoning:**\n{decision.get('reasoning', 'Analysis details available in logs.')}\n\n"
+            f"**Strategic Recommendations:**\n{decision.get('recommendations', 'Manual review of credit history required.')}\n\n"
+            f"**Policy References:**\n{decision.get('references', 'No specific policy citations retrieved.')}\n\n"
+            f"***Disclaimer:*** *{decision.get('disclaimer', 'Advisory report only. Final approval subject to bank compliance.')}*"
         )
         st.session_state.agent_chat_history.append(("user", user_message))
         st.session_state.agent_chat_history.append(("assistant", agent_message))
